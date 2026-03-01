@@ -84,6 +84,15 @@ ENV_VARS=(
     LC_ALL=C.UTF-8
 )
 
+# Detect if ROOT is set for installation
+if [ -n "${ROOT}" ]; then
+    mkdir -p "${ROOT}"
+    # Convert to absolute path
+    ROOT_ABS=$(realpath "${ROOT}")
+    BWRAP_ARGS+=(--bind "${ROOT_ABS}" "${ROOT_ABS}")
+    ENV_VARS+=(ROOT="${ROOT_ABS}")
+fi
+
 for env in "${ENV_VARS[@]}"; do
     BWRAP_ARGS+=(--setenv "${env%%=*}" "${env#*=}")
 done
