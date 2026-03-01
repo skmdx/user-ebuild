@@ -78,6 +78,10 @@ rm -rf /tmp/gentoo-user-ebuild-${USER}
 - **System Installation**: This script is designed for building and testing. It cannot install packages into your live system's `/usr` or `/lib` because the root filesystem is mounted read-only.
 - **Dependencies**: It relies on your host system's installed libraries and headers to satisfy build dependencies. If a package requires a dependency not present on the host, the build will fail.
 
+## Credits
+
+This project was developed with the assistance of **Gemini 3.0**.
+
 ## License
 
 MIT License
