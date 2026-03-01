@@ -1,0 +1,92 @@
+#!/bin/bash
+# user-ebuild: Run ebuild commands with user privileges using bwrap
+
+# Configuration
+SANDBOX_ROOT="/tmp/gentoo-user-ebuild-${USER}"
+mkdir -p "${SANDBOX_ROOT}"
+
+PORTAGE_TMPDIR="${SANDBOX_ROOT}/var/tmp/portage"
+DISTDIR="${SANDBOX_ROOT}/var/cache/distfiles"
+PKGDIR="${SANDBOX_ROOT}/var/cache/binpkgs"
+ETC_PORTAGE="${SANDBOX_ROOT}/etc/portage"
+VAR_LIB_PORTAGE="${SANDBOX_ROOT}/var/lib/portage"
+VAR_DB_PKG="${SANDBOX_ROOT}/var/db/pkg"
+
+# Ensure directories exist
+mkdir -p "${PORTAGE_TMPDIR}" "${DISTDIR}" "${PKGDIR}" "${ETC_PORTAGE}" "${VAR_LIB_PORTAGE}" "${VAR_DB_PKG}"
+
+# Create fake passwd and group
+cat > "${SANDBOX_ROOT}/passwd" <<EOF
+root:x:0:0:root:/tmp:/bin/bash
+portage:x:0:0:portage:/tmp:/sbin/nologin
+${USER}:x:0:0:${USER}:/tmp:/bin/bash
+EOF
+cat > "${SANDBOX_ROOT}/group" <<EOF
+root:x:0:
+portage:x:0:
+${USER}:x:0:
+EOF
+
+# Initialize etc/portage if empty
+if [ ! -d "${ETC_PORTAGE}/make.conf" ] && [ ! -f "${ETC_PORTAGE}/make.conf" ]; then
+    cp -ra /etc/portage/* "${ETC_PORTAGE}/" 2>/dev/null || true
+fi
+
+# Prepare bwrap arguments
+BWRAP_ARGS=(
+    --unshare-all
+    --share-net
+    --uid 0 --gid 0
+    --ro-bind / /
+    --proc /proc
+    --dev /dev
+    --tmpfs /tmp --chmod 1777 /tmp
+    --tmpfs /var/tmp --chmod 1777 /var/tmp
+    --dir /run
+    --bind "${SANDBOX_ROOT}/passwd" /etc/passwd
+    --bind "${SANDBOX_ROOT}/group" /etc/group
+    --bind "${PORTAGE_TMPDIR}" /var/tmp/portage
+    --bind "${DISTDIR}" /var/cache/distfiles
+    --bind "${PKGDIR}" /var/cache/binpkgs
+    --bind "${ETC_PORTAGE}" /etc/portage
+    --bind "${VAR_LIB_PORTAGE}" /var/lib/portage
+    --bind "${VAR_DB_PKG}" /var/db/pkg
+)
+
+# Detect if we need to bind-mount the ebuild's directory as writable
+# This is useful for 'manifest' command in local overlays
+if [[ "$*" == *"manifest"* ]]; then
+    for arg in "$@"; do
+        if [[ "$arg" == *.ebuild ]] && [[ -f "$arg" ]]; then
+            EBUILD_DIR=$(dirname "$(realpath "$arg")")
+            # If the ebuild is in a writable location, bind it
+            if [[ -w "$EBUILD_DIR" ]]; then
+                BWRAP_ARGS+=(--bind "$EBUILD_DIR" "$EBUILD_DIR")
+            fi
+        fi
+    done
+fi
+
+# Set environment variables
+ENV_VARS=(
+    PORTAGE_TMPDIR=/var/tmp/portage
+    DISTDIR=/var/cache/distfiles
+    PKGDIR=/var/cache/binpkgs
+    HOME=/tmp
+    TMPDIR=/tmp
+    TEMP=/tmp
+    TMP=/tmp
+    FEATURES="-userpriv -usersandbox -sandbox -ipc-sandbox -network-sandbox -pid-sandbox -userfetch"
+    PORTAGE_USERNAME=root
+    PORTAGE_GRPNAME=root
+    PORTAGE_INST_UID=0
+    PORTAGE_INST_GID=0
+    LC_ALL=C.UTF-8
+)
+
+for env in "${ENV_VARS[@]}"; do
+    BWRAP_ARGS+=(--setenv "${env%%=*}" "${env#*=}")
+done
+
+# Run the command
+exec bwrap "${BWRAP_ARGS[@]}" /usr/bin/ebuild "$@"
