@@ -41,6 +41,9 @@
 # バイナリパッケージ (.xpak または .gpkg.tar) の作成
 ./user-ebuild /path/to/category/package/package-version.ebuild package
 
+# 一時ディレクトリへのインストール (Merge)
+ROOT=/tmp/my-install ./user-ebuild /path/to/category/package/package-version.ebuild merge
+
 # Manifest の更新（ローカルオーバーレイ用）
 ./user-ebuild /path/to/category/package/package-version.ebuild manifest
 ```

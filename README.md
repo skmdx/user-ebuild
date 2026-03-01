@@ -41,6 +41,9 @@ Run it exactly like the standard `ebuild` command:
 # Create a binary package (.xpak or .gpkg.tar)
 ./user-ebuild /path/to/category/package/package-version.ebuild package
 
+# Install to a custom temporary directory (Merge)
+ROOT=/tmp/my-install ./user-ebuild /path/to/category/package/package-version.ebuild merge
+
 # Update Manifest (for local overlays)
 ./user-ebuild /path/to/category/package/package-version.ebuild manifest
 ```
